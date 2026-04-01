@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Organizasyon Birimleri (OU)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f8f9fa;
+      --surface: #ffffff;
+      --surface-2: #f1f3f4;
+      --text: #202124;
+      --muted: #5f6368;
+      --border: #e0e3e7;
+      --primary: #1a73e8;
+      --primary-soft: #e8f0fe;
+      --success: #188038;
+      --warning: #f9ab00;
+      --danger: #d93025;
+      --shadow: 0 1px 2px rgba(60, 64, 67, 0.15), 0 1px 3px 1px rgba(60, 64, 67, 0.1);
+      --radius: 14px;
+      --sidebar-w: 260px;
+      --topbar-h: 72px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: var(--sidebar-w) 1fr;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      padding: 20px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 10px;
+      border-radius: 12px;
+    }
+
+    .brand-logo {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: linear-gradient(145deg, #1a73e8, #4f9af4);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+    }
+
+    .brand h1 {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .brand p {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .menu-group {
+      display: grid;
+      gap: 6px;
+    }
+
+    .menu-title {
+      padding: 10px;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .menu-item {
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+      width: 100%;
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .menu-item:hover {
+      background: var(--surface-2);
+    }
+
+    .menu-item.active {
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .menu-item .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.85;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      border: 1px solid var(--border);
+      background: #fafbfd;
+      padding: 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .content {
+      display: grid;
+      grid-template-rows: var(--topbar-h) 1fr;
+      min-width: 0;
+    }
+
+    .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 22px;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .topbar h2 {
+      font-size: 18px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .date-chip {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--muted);
+      padding: 7px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .icon-btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #d2e3fc;
+      color: #174ea6;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .main {
+      padding: 22px;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .page-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .page-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .page-subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .head-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 13px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+
+    .btn.primary {
+      border-color: #b9d1fb;
+      background: var(--primary-soft);
+      color: var(--primary);
+    }
+
+    .btn:hover {
+      filter: brightness(0.98);
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 14px;
+      min-height: 580px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-head {
+      padding: 14px 16px 10px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+
+    .card-subtitle {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .tree-wrap {
+      padding: 10px;
+      max-height: 520px;
+      overflow: auto;
+    }
+
+    .tree, .tree ul {
+      list-style: none;
+      margin: 0;
+      padding-left: 12px;
+    }
+
+    .tree ul {
+      border-left: 1px dashed #d8dbe1;
+      margin-left: 8px;
+    }
+
+    .ou-item {
+      margin: 6px 0;
+    }
+
+    .ou-btn {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      text-align: left;
+      padding: 8px 9px;
+      border-radius: 9px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      cursor: pointer;
+      color: var(--text);
+    }
+
+    .ou-btn:hover {
+      background: var(--surface-2);
+    }
+
+    .ou-btn.active {
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .ou-left {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .ou-left .folder {
+      font-size: 13px;
+    }
+
+    .ou-count {
+      font-size: 11px;
+      color: var(--muted);
+      background: #f3f5f8;
+      border: 1px solid var(--border);
+      padding: 2px 7px;
+      border-radius: 999px;
+    }
+
+    .detail-body {
+      padding: 14px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .stat {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      background: #fbfcfe;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      text-align: left;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      background: #fbfcfe;
+    }
+
+    .type-badge {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 3px 7px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #3c4043;
+      background: #fff;
+    }
+
+    .move-btn {
+      border: 1px solid #bfd3fa;
+      border-radius: 8px;
+      background: #e8f0fe;
+      color: #174ea6;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 8px;
+      cursor: pointer;
+    }
+
+    @media (max-width: 1100px) {
+      .split {
+        grid-template-columns: 1fr;
+      }
+      .detail-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 880px) {
+      .layout { grid-template-columns: 84px 1fr; }
+      .brand-text, .menu-item span:not(.dot), .menu-title, .sidebar-footer { display: none; }
+      .menu-item { justify-content: center; }
+      .date-chip { display: none; }
+      .main { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">GA</div>
+        <div class="brand-text">
+          <h1>Admin Console</h1>
+          <p>Workspace Yonetimi</p>
+        </div>
+      </div>
+
+      <nav class="menu-group">
+        <div class="menu-title">Genel</div>
+        <button class="menu-item"><span class="dot"></span><span>Dashboard</span></button>
+        <button class="menu-item active"><span class="dot"></span><span>Kullanicilar</span></button>
+        <button class="menu-item"><span class="dot"></span><span>Cihazlar</span></button>
+        <button class="menu-item"><span class="dot"></span><span>Guvenlik</span></button>
+      </nav>
+
+      <nav class="menu-group">
+        <div class="menu-title">Yonetim</div>
+        <button class="menu-item"><span class="dot"></span><span>Raporlar</span></button>
+        <button class="menu-item"><span class="dot"></span><span>Denetim Gunlugu</span></button>
+        <button class="menu-item"><span class="dot"></span><span>Ayarlar</span></button>
+      </nav>
+
+      <div class="sidebar-footer">
+        OU agacinda toplam <strong>7 birim</strong> bulunuyor.<br />
+        Son AD/Entra senkronu: 10:29
+      </div>
+    </aside>
+
+    <div class="content">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h2>Organizasyon Yonetimi</h2>
+          <span class="date-chip">31 Mart 2026, Sali</span>
+        </div>
+        <div class="topbar-right">
+          <button class="icon-btn" aria-label="Bildirimler">🔔</button>
+          <button class="icon-btn" aria-label="Yardim">❔</button>
+          <div class="avatar" title="Burak Abanoz">BA</div>
+        </div>
+      </header>
+
+      <main class="main">
+        <section class="page-head">
+          <div>
+            <h1 class="page-title">Organizasyon Birimleri (OU)</h1>
+            <p class="page-subtitle">Sirket.com hiyerarsisini secilebilir agac gorunumunde yonetin.</p>
+          </div>
+          <div class="head-actions">
+            <button class="btn primary" type="button">+ Yeni Alt Birim Ekle</button>
+            <button class="btn" type="button">AD / Entra ID Senkronizasyonu</button>
+          </div>
+        </section>
+
+        <section class="split">
+          <article class="card">
+            <div class="card-head">
+              <h3 class="card-title">Agac Gorunumu</h3>
+              <p class="card-subtitle">Bir birime tiklayarak sag panelde detaylarini goruntuleyin.</p>
+            </div>
+            <div class="tree-wrap">
+              <ul class="tree">
+                <li class="ou-item">
+                  <button class="ou-btn active" data-ou="root">
+                    <span class="ou-left"><span class="folder">📁</span><span>Sirket.com</span></span>
+                    <span class="ou-count">412</span>
+                  </button>
+                  <ul>
+                    <li class="ou-item">
+                      <button class="ou-btn" data-ou="it">
+                        <span class="ou-left"><span class="folder">📂</span><span>BT Departmani</span></span>
+                        <span class="ou-count">96</span>
+                      </button>
+                      <ul>
+                        <li class="ou-item">
+                          <button class="ou-btn" data-ou="soc">
+                            <span class="ou-left"><span class="folder">📂</span><span>SOC Ekibi</span></span>
+                            <span class="ou-count">18</span>
+                          </button>
+                        </li>
+                        <li class="ou-item">
+                          <button class="ou-btn" data-ou="helpdesk">
+                            <span class="ou-left"><span class="folder">📂</span><span>Helpdesk</span></span>
+                            <span class="ou-count">23</span>
+                          </button>
+                        </li>
+                      </ul>
+                    </li>
+                    <li class="ou-item">
+                      <button class="ou-btn" data-ou="finance">
+                        <span class="ou-left"><span class="folder">📂</span><span>Muhasebe</span></span>
+                        <span class="ou-count">54</span>
+                      </button>
+                    </li>
+                    <li class="ou-item">
+                      <button class="ou-btn" data-ou="field">
+                        <span class="ou-left"><span class="folder">📂</span><span>Saha Ekibi</span></span>
+                        <span class="ou-count">128</span>
+                      </button>
+                    </li>
+                    <li class="ou-item">
+                      <button class="ou-btn" data-ou="hr">
+                        <span class="ou-left"><span class="folder">📂</span><span>Insan Kaynaklari</span></span>
+                        <span class="ou-count">34</span>
+                      </button>
+                    </li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <h3 class="card-title">Birim Detaylari</h3>
+              <p class="card-subtitle" id="detailPath">Secili OU: /Sirket.com</p>
+            </div>
+            <div class="detail-body">
+              <div class="detail-grid">
+                <div class="stat">
+                  <div class="stat-label">Birim Adi</div>
+                  <div class="stat-value" id="detailName">Sirket.com</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Toplam Cihaz</div>
+                  <div class="stat-value" id="detailDevices">248</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Toplam Kullanici</div>
+                  <div class="stat-value" id="detailUsers">164</div>
+                </div>
+              </div>
+
+              <div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Ad / Varlik</th>
+                      <th>Tur</th>
+                      <th>Durum</th>
+                      <th>Aksiyon</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ouTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const ouData = {
+      root: {
+        name: "Sirket.com",
+        path: "/Sirket.com",
+        devices: 248,
+        users: 164,
+        rows: [
+          { name: "LT-IST-221", type: "Cihaz", status: "Aktif" },
+          { name: "MBP-ANK-19", type: "Cihaz", status: "Aktif" },
+          { name: "Ayse Demir", type: "Kullanici", status: "Aktif" },
+          { name: "Mert Aksoy", type: "Kullanici", status: "Aktif" }
+        ]
+      },
+      it: {
+        name: "BT Departmani",
+        path: "/Sirket.com/BT Departmani",
+        devices: 61,
+        users: 35,
+        rows: [
+          { name: "SOC-SRV-03", type: "Cihaz", status: "Aktif" },
+          { name: "LT-IT-093", type: "Cihaz", status: "Aktif" },
+          { name: "Zeynep Karaca", type: "Kullanici", status: "Aktif" },
+          { name: "Tugrul Kara", type: "Kullanici", status: "Izinli" }
+        ]
+      },
+      soc: {
+        name: "SOC Ekibi",
+        path: "/Sirket.com/BT Departmani/SOC Ekibi",
+        devices: 12,
+        users: 9,
+        rows: [
+          { name: "SOC-VM-01", type: "Cihaz", status: "Aktif" },
+          { name: "SOC-VM-02", type: "Cihaz", status: "Aktif" },
+          { name: "Burak Ozturk", type: "Kullanici", status: "Aktif" }
+        ]
+      },
+      helpdesk: {
+        name: "Helpdesk",
+        path: "/Sirket.com/BT Departmani/Helpdesk",
+        devices: 19,
+        users: 14,
+        rows: [
+          { name: "HD-LT-14", type: "Cihaz", status: "Aktif" },
+          { name: "HD-LT-15", type: "Cihaz", status: "Aktif" },
+          { name: "Selin Yilmaz", type: "Kullanici", status: "Aktif" }
+        ]
+      },
+      finance: {
+        name: "Muhasebe",
+        path: "/Sirket.com/Muhasebe",
+        devices: 38,
+        users: 27,
+        rows: [
+          { name: "ACC-LT-08", type: "Cihaz", status: "Aktif" },
+          { name: "ACC-LT-09", type: "Cihaz", status: "Bakim" },
+          { name: "Fatma Aydin", type: "Kullanici", status: "Aktif" }
+        ]
+      },
+      field: {
+        name: "Saha Ekibi",
+        path: "/Sirket.com/Saha Ekibi",
+        devices: 102,
+        users: 68,
+        rows: [
+          { name: "FIELD-TAB-41", type: "Cihaz", status: "Aktif" },
+          { name: "FIELD-LT-88", type: "Cihaz", status: "Aktif" },
+          { name: "Emre Koc", type: "Kullanici", status: "Aktif" }
+        ]
+      },
+      hr: {
+        name: "Insan Kaynaklari",
+        path: "/Sirket.com/Insan Kaynaklari",
+        devices: 16,
+        users: 11,
+        rows: [
+          { name: "HR-LT-06", type: "Cihaz", status: "Aktif" },
+          { name: "Merve Das", type: "Kullanici", status: "Aktif" },
+          { name: "Eda Keskin", type: "Kullanici", status: "Aktif" }
+        ]
+      }
+    };
+
+    const detailName = document.getElementById("detailName");
+    const detailPath = document.getElementById("detailPath");
+    const detailDevices = document.getElementById("detailDevices");
+    const detailUsers = document.getElementById("detailUsers");
+    const ouTableBody = document.getElementById("ouTableBody");
+    const ouButtons = document.querySelectorAll(".ou-btn");
+
+    function renderDetail(key) {
+      const selected = ouData[key];
+      detailName.textContent = selected.name;
+      detailPath.textContent = `Secili OU: ${selected.path}`;
+      detailDevices.textContent = selected.devices;
+      detailUsers.textContent = selected.users;
+
+      ouTableBody.innerHTML = "";
+      selected.rows.forEach((row) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${row.name}</td>
+          <td><span class="type-badge">${row.type}</span></td>
+          <td>${row.status}</td>
+          <td><button class="move-btn" type="button">Tasi</button></td>
+        `;
+        ouTableBody.appendChild(tr);
+      });
+    }
+
+    ouButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        ouButtons.forEach((btn) => btn.classList.remove("active"));
+        button.classList.add("active");
+        renderDetail(button.dataset.ou);
+      });
+    });
+
+    renderDetail("it");
+    document.querySelector('[data-ou="it"]').classList.add("active");
+    document.querySelector('[data-ou="root"]').classList.remove("active");
+  </script>
+</body>
+</html>
