@@ -11,4 +11,9 @@ public class SecuritySettings
     /// Cihaz raporlarında zorunlu tutulan kayıt (enrollment) anahtarı.
     /// </summary>
     public string EnrollmentToken { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Dashboard yönetim uçları için X-Admin-Api-Key başlığı (boşsa doğrulama yapılmaz — yalnızca geliştirme).
+    /// </summary>
+    public string AdminApiKey { get; set; } = string.Empty;
 }

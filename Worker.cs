@@ -10,9 +10,11 @@ namespace EndpointAgent
     /// </summary>
     public class Worker : BackgroundService
     {
-        // Bir önceki döngüde policy enforceni sonucu (payload ile geri raporlanır).
         private bool _lastStatus = true;
         private string? _lastError = null;
+
+        /// <summary>Son başarılı API raporundan sonra envanter hash'i (delta rapor için).</summary>
+        private string? _lastSuccessfulExtensionsHash;
 
         private readonly ILogger<Worker> _logger;
         private readonly IDiscoveryService _discoveryService;
@@ -35,7 +37,7 @@ namespace EndpointAgent
             var minutes = workerSettingsOptions.Value.IntervalMinutes;
             if (minutes <= 0)
             {
-                minutes = 1; // Koruyucu: yanlış konfigurasyonda bile en az 1 dakika.
+                minutes = 1;
             }
 
             _interval = TimeSpan.FromMinutes(minutes);
@@ -52,25 +54,43 @@ namespace EndpointAgent
                     _logger.LogInformation("Keşif + Raporlama döngüsü başladı.");
 
                     var extensions = _discoveryService.DiscoverInstalledExtensions();
+                    var hash = _discoveryService.GetExtensionsHash(extensions);
+                    var useDelta = _lastSuccessfulExtensionsHash != null &&
+                        string.Equals(hash, _lastSuccessfulExtensionsHash, StringComparison.Ordinal);
 
-                    // Raporu gönder ve backend'den cihaz politikalarını al.
-                    DevicePolicyResponse? policy = await _apiReporter.SendReportAsync(
+                    if (useDelta)
+                    {
+                        _logger.LogInformation(
+                            "Eklenti envanteri önceki başarılı rapor ile aynı hash; delta (HasChanged=false) gönderiliyor.");
+                    }
+
+                    var policy = await _apiReporter.SendReportAsync(
                         extensions,
+                        useDelta,
                         _lastStatus,
                         _lastError,
                         stoppingToken);
 
-                    // Gelen politika varsa, cihaza uygula.
                     if (policy != null)
                     {
+                        _lastSuccessfulExtensionsHash = hash;
+
                         _logger.LogInformation(
-                            "Policy yanıtı alındı. ForceInstallChrome={ForceC}, BlockChrome={BlockC}, AllowChrome={AllowC}, ForceInstallEdge={ForceE}, BlockEdge={BlockE}, AllowEdge={AllowE}",
+                            "Policy yanıtı alındı. ForceInstallChrome={ForceC}, BlockChrome={BlockC}, AllowChrome={AllowC}, ForceInstallEdge={ForceE}, BlockEdge={BlockE}, AllowEdge={AllowE}, BrowserSettings={HasBs}",
                             policy.ForceInstallChrome?.Count ?? 0,
                             policy.BlockChrome?.Count ?? 0,
                             policy.AllowChrome?.Count ?? 0,
                             policy.ForceInstallEdge?.Count ?? 0,
                             policy.BlockEdge?.Count ?? 0,
-                            policy.AllowEdge?.Count ?? 0);
+                            policy.AllowEdge?.Count ?? 0,
+                            policy.Settings != null);
+
+                        if (policy.Settings != null)
+                        {
+                            var bsOk = _policyEnforcer.ApplyBrowserSettings(policy.Settings);
+                            if (!bsOk)
+                                _logger.LogWarning("ApplyBrowserSettings tamamlanamadı: {Err}", _policyEnforcer.LastErrorMessage);
+                        }
 
                         var chromeOk = _policyEnforcer.ApplyPolicies(
                             "Chrome",
@@ -94,6 +114,11 @@ namespace EndpointAgent
                     else
                     {
                         _logger.LogDebug("Bu döngüde uygulanacak bir politika alınmadı.");
+                        if (useDelta)
+                        {
+                            _lastSuccessfulExtensionsHash = null;
+                            _logger.LogInformation("Delta raporu başarısız; sonraki döngüde tam envanter gönderilecek.");
+                        }
                     }
 
                     _logger.LogInformation(
@@ -103,7 +128,6 @@ namespace EndpointAgent
                 }
                 catch (Exception ex)
                 {
-                    // Worker'ın crash olmasını engellememek için tüm hataları loglarız.
                     _logger.LogError(ex, "Keşif/raporlama döngüsü sırasında hata oluştu.");
                 }
 
@@ -113,7 +137,6 @@ namespace EndpointAgent
                 }
                 catch (TaskCanceledException)
                 {
-                    // Servis durdurulurken beklenen davranış.
                 }
             }
 

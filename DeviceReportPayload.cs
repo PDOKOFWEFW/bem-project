@@ -21,6 +21,11 @@ namespace EndpointAgent.Models
         public bool LastPolicyAppliedStatus { get; set; } = true;
         public string? LastErrorMessage { get; set; }
 
+        /// <summary>
+        /// false ise envanter değişmemiş kabul edilir; Extensions boş gönderilebilir.
+        /// </summary>
+        public bool HasChanged { get; set; } = true;
+
         [JsonPropertyName("Extensions")]
         public List<ExtensionInfo> Extensions { get; set; } = new();
     }

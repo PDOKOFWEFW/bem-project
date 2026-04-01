@@ -12,12 +12,14 @@ namespace EndpointApi.Controllers;
 public class DeviceReportController : ControllerBase
 {
     private const string EnrollmentHeaderName = "X-Enrollment-Token";
+    private const string AdminApiKeyHeaderName = "X-Admin-Api-Key";
     private const string UnassignedOuName = "Unassigned";
 
     private readonly AppDbContext _db;
     private readonly IPolicyEngine _policyEngine;
     private readonly IRiskScoringService _riskScoring;
     private readonly IEnrollmentTokenValidator _tokenValidator;
+    private readonly IAdminApiKeyValidator _adminApiKeyValidator;
     private readonly ILogger<DeviceReportController> _logger;
 
     public DeviceReportController(
@@ -25,12 +27,14 @@ public class DeviceReportController : ControllerBase
         IPolicyEngine policyEngine,
         IRiskScoringService riskScoring,
         IEnrollmentTokenValidator tokenValidator,
+        IAdminApiKeyValidator adminApiKeyValidator,
         ILogger<DeviceReportController> logger)
     {
         _db = db;
         _policyEngine = policyEngine;
         _riskScoring = riskScoring;
         _tokenValidator = tokenValidator;
+        _adminApiKeyValidator = adminApiKeyValidator;
         _logger = logger;
     }
 
@@ -106,27 +110,40 @@ public class DeviceReportController : ControllerBase
             device.LastErrorMessage = payload.LastErrorMessage;
         }
 
-        var existingExtensions = await _db.Extensions
-            .Where(e => e.DeviceId == device.Id)
-            .ToListAsync(cancellationToken);
-        _db.Extensions.RemoveRange(existingExtensions);
+        List<Extension> newRows;
+        var skipInventory = !payload.HasChanged && device.Id != 0;
 
-        var newRows = new List<Extension>();
-        foreach (var item in payload.Extensions)
+        if (skipInventory && await _db.Extensions.AnyAsync(e => e.DeviceId == device.Id, cancellationToken))
         {
-            newRows.Add(new Extension
-            {
-                DeviceId = device.Id,
-                ExtensionId = item.ExtensionId ?? string.Empty,
-                ExtensionName = item.ExtensionName ?? string.Empty,
-                ExtensionVersion = item.ExtensionVersion ?? string.Empty,
-                BrowserType = item.BrowserType ?? string.Empty,
-                LastReportedUtc = now
-            });
+            newRows = await _db.Extensions
+                .Where(e => e.DeviceId == device.Id)
+                .ToListAsync(cancellationToken);
+            _logger.LogInformation("Delta rapor: cihaz {DeviceId} için envanter DB'den korunuyor.", device.DeviceId);
         }
+        else
+        {
+            var existingExtensions = await _db.Extensions
+                .Where(e => e.DeviceId == device.Id)
+                .ToListAsync(cancellationToken);
+            _db.Extensions.RemoveRange(existingExtensions);
 
-        if (newRows.Count > 0)
-            await _db.Extensions.AddRangeAsync(newRows, cancellationToken);
+            newRows = new List<Extension>();
+            foreach (var item in payload.Extensions)
+            {
+                newRows.Add(new Extension
+                {
+                    DeviceId = device.Id,
+                    ExtensionId = item.ExtensionId ?? string.Empty,
+                    ExtensionName = item.ExtensionName ?? string.Empty,
+                    ExtensionVersion = item.ExtensionVersion ?? string.Empty,
+                    BrowserType = item.BrowserType ?? string.Empty,
+                    LastReportedUtc = now
+                });
+            }
+
+            if (newRows.Count > 0)
+                await _db.Extensions.AddRangeAsync(newRows, cancellationToken);
+        }
 
         await _db.SaveChangesAsync(cancellationToken);
 
@@ -135,10 +152,10 @@ public class DeviceReportController : ControllerBase
         _db.AuditLogs.Add(new AuditLog
         {
             OccurredUtc = now,
-            Action = "DeviceReport",
+            Action = skipInventory ? "DeviceReport (delta)" : "DeviceReport",
             Actor = "EndpointAgent",
             DeviceId = device.Id,
-            Details = $"Eklenti: {newRows.Count}, OU: {device.OrganizationUnitId}, User: {payload.LoggedOnUser}, IP: {payload.IpAddress}"
+            Details = $"Eklenti: {newRows.Count}, OU: {device.OrganizationUnitId}, HasChanged: {payload.HasChanged}"
         });
 
         await _db.SaveChangesAsync(cancellationToken);
@@ -146,5 +163,70 @@ public class DeviceReportController : ControllerBase
 
         var policy = _policyEngine.BuildResponseForOrganizationUnit(device.OrganizationUnitId);
         return Ok(policy);
+    }
+
+    /// <summary>
+    /// Cihazı hedef OU'ya taşır (dashboard).
+    /// </summary>
+    [HttpPost("move-ou")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> MoveOrganizationUnitAsync(
+        [FromBody] MoveDeviceOuRequest body,
+        CancellationToken cancellationToken)
+    {
+        var adminKey = Request.Headers[AdminApiKeyHeaderName].FirstOrDefault();
+        if (!_adminApiKeyValidator.IsValid(adminKey))
+        {
+            _logger.LogWarning("move-ou: geçersiz veya eksik Admin API anahtarı.");
+            return Unauthorized();
+        }
+
+        if (string.IsNullOrWhiteSpace(body.DeviceId))
+            return BadRequest("deviceId gerekli.");
+
+        OrganizationalUnit? targetOu = null;
+        if (body.TargetOrganizationUnitId is > 0)
+        {
+            targetOu = await _db.OrganizationalUnits
+                .FirstOrDefaultAsync(o => o.Id == body.TargetOrganizationUnitId.Value, cancellationToken);
+        }
+        else if (!string.IsNullOrWhiteSpace(body.TargetOrganizationUnitName))
+        {
+            var name = body.TargetOrganizationUnitName.Trim();
+            targetOu = await _db.OrganizationalUnits
+                .FirstOrDefaultAsync(o => o.Name == name, cancellationToken);
+        }
+
+        if (targetOu == null)
+            return NotFound("Hedef OU bulunamadı (ad veya Id kontrol edin).");
+
+        var device = await _db.Devices.FirstOrDefaultAsync(d => d.DeviceId == body.DeviceId.Trim(), cancellationToken);
+        if (device == null)
+            return NotFound("Cihaz bulunamadı.");
+
+        var oldOuId = device.OrganizationUnitId;
+        device.OrganizationUnitId = targetOu.Id;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            OccurredUtc = DateTimeOffset.UtcNow,
+            Action = "DeviceMoveOu",
+            Actor = "Dashboard",
+            DeviceId = device.Id,
+            Details = $"OU {oldOuId} -> {targetOu.Id} ({targetOu.Name})"
+        });
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Cihaz {DeviceId} OU taşındı: {OldOu} -> {NewOu}",
+            device.DeviceId,
+            oldOuId,
+            targetOu.Name);
+
+        return NoContent();
     }
 }

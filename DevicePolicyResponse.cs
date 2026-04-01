@@ -34,6 +34,11 @@ namespace EndpointAgent.Models
         /// Edge için izin verilecek (allowlist) eklenti ID listesi.
         /// </summary>
         public List<string> AllowEdge { get; set; } = new();
+
+        /// <summary>
+        /// İsteğe bağlı genel tarayıcı (GPO) ayarları.
+        /// </summary>
+        public BrowserSettings? Settings { get; set; }
     }
 }
 

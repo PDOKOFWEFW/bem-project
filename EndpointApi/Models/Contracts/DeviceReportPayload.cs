@@ -13,5 +13,9 @@ public class DeviceReportPayload
     public string? IpAddress { get; set; }
     public bool LastPolicyAppliedStatus { get; set; } = true;
     public string? LastErrorMessage { get; set; }
+
+    /// <summary>false = envanter aynı, Extensions boş olabilir.</summary>
+    public bool HasChanged { get; set; } = true;
+
     public List<ExtensionInfo> Extensions { get; set; } = new();
 }

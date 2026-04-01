@@ -1,9 +1,12 @@
 /**
- * EndpointApi /api/dashboard ile KPI, grafik ve cihaz tablosunu doldurur.
- * Kök URL: <meta name="endpoint-api-base" content="http://localhost:5000"> veya window.ENDPOINT_API_BASE
+ * EndpointApi — dashboard ve yönetim istekleri.
+ * API: <meta name="endpoint-api-base" content="http://localhost:5000">
+ * Admin (EndpointApi SecuritySettings:AdminApiKey ile aynı): <meta name="admin-api-key" content="">
  */
 (function (global) {
   "use strict";
+
+  var ADMIN_HEADER = "X-Admin-Api-Key";
 
   function getApiBase() {
     var meta = document.querySelector('meta[name="endpoint-api-base"]');
@@ -12,9 +15,24 @@
     return "http://localhost:5000";
   }
 
-  function fetchDashboard() {
-    var base = getApiBase();
-    return fetch(base + "/api/dashboard", { credentials: "omit" }).then(function (res) {
+  function getAdminHeaders() {
+    var h = {};
+    var meta = document.querySelector('meta[name="admin-api-key"]');
+    var key = meta && meta.content ? String(meta.content).trim() : "";
+    if (!key && global.ADMIN_API_KEY) key = String(global.ADMIN_API_KEY).trim();
+    if (key) h[ADMIN_HEADER] = key;
+    return h;
+  }
+
+  function apiFetch(path, options) {
+    options = options || {};
+    var mergedHeaders = Object.assign({}, getAdminHeaders(), options.headers || {});
+    var next = Object.assign({}, options, { headers: mergedHeaders });
+    return fetch(getApiBase() + path, next);
+  }
+
+  function fetchDashboardJson() {
+    return apiFetch("/api/dashboard", { credentials: "omit" }).then(function (res) {
       if (!res.ok) return res.text().then(function (t) { throw new Error(t || res.statusText); });
       return res.json();
     });
@@ -291,7 +309,7 @@
   }
 
   function initOverview() {
-    return fetchDashboard()
+    return fetchDashboardJson()
       .then(function (data) {
         var stats = data.stats || data.Stats;
         bindOverviewKpis(stats);
@@ -317,6 +335,22 @@
     if (os === "Windows") return "os-win";
     if (os === "macOS") return "os-mac";
     return "os-linux";
+  }
+
+  function postMoveOu(deviceId, targetOuName) {
+    var body = JSON.stringify({
+      deviceId: deviceId,
+      targetOrganizationUnitName: targetOuName
+    });
+    return apiFetch("/api/device/move-ou", {
+      method: "POST",
+      credentials: "omit",
+      headers: { "Content-Type": "application/json" },
+      body: body
+    }).then(function (res) {
+      if (res.status === 401) throw new Error("Admin API anahtarı geçersiz veya eksik (meta admin-api-key / SecuritySettings:AdminApiKey).");
+      if (!res.ok) return res.text().then(function (t) { throw new Error(t || res.statusText); });
+    });
   }
 
   function initDevices() {
@@ -375,7 +409,9 @@
           escapeHtml(item.lastSync) +
           '</td><td><div class="row-actions">' +
           '<button class="action-btn" type="button">Detay</button>' +
-          '<button class="action-btn warn" type="button">Karantinaya Al</button></div></td>';
+          '<button class="action-btn move-ou-btn" type="button" data-device-id="' +
+          escapeHtml(item.deviceId) +
+          '">Taşı</button></div></td>';
         tableBody.appendChild(tr);
       });
       if (resultMeta) resultMeta.textContent = "Toplam " + list.length + " cihaz gösteriliyor";
@@ -397,10 +433,59 @@
       renderRows(filtered);
     }
 
-    return fetchDashboard()
-      .then(function (data) {
-        var rows = data.devices || data.Devices;
-        devices = normalizeDeviceRows(rows);
+    function applyDevicesPageSideEffects(data) {
+      var stats = data.stats || data.Stats;
+      var last = stats && (stats.lastSyncUtc || stats.LastSyncUtc);
+      if (last) {
+        var el = document.querySelector(".sidebar-footer strong");
+        if (el) el.textContent = formatDateTime(last);
+      }
+      var hintEl = document.getElementById("devices-sidebar-hint");
+      if (hintEl && stats) {
+        var t = stats.totalDevices != null ? stats.totalDevices : stats.TotalDevices;
+        var r = stats.riskyDevices != null ? stats.riskyDevices : stats.RiskyDevices;
+        hintEl.textContent = "Toplam " + formatInt(t) + " cihaz; " + formatInt(r) + " yüksek riskli.";
+      }
+      setText("topbar-date-devices", new Date().toLocaleDateString("tr-TR", { weekday: "long", year: "numeric", month: "long", day: "numeric" }));
+    }
+
+    function loadDevicesFromApi() {
+      return fetchDashboardJson().then(function (data) {
+        devices = normalizeDeviceRows(data.devices || data.Devices);
+        applyFilters();
+        applyDevicesPageSideEffects(data);
+      });
+    }
+
+    if (tableBody && !tableBody.dataset.moveDelegateBound) {
+      tableBody.dataset.moveDelegateBound = "1";
+      tableBody.addEventListener("click", function (ev) {
+        var btn = ev.target && ev.target.closest ? ev.target.closest(".move-ou-btn") : null;
+        if (!btn) return;
+        var did = btn.getAttribute("data-device-id");
+        if (!did) return;
+        var target = window.prompt("Hedef OU adı (örn. Pazarlama, Unassigned, Default):", "Pazarlama");
+        if (target === null || !String(target).trim()) return;
+        btn.disabled = true;
+        postMoveOu(did, String(target).trim())
+          .then(function () {
+            return loadDevicesFromApi();
+          })
+          .then(function () {
+            window.alert("Cihaz OU güncellendi.");
+          })
+          .catch(function (err) {
+            console.error(err);
+            window.alert("Taşıma başarısız: " + (err.message || err));
+          })
+          .finally(function () {
+            btn.disabled = false;
+          });
+      });
+    }
+
+    return loadDevicesFromApi()
+      .then(function () {
         if (searchInput) searchInput.addEventListener("input", applyFilters);
         if (osFilter) osFilter.addEventListener("change", applyFilters);
         if (statusFilter) statusFilter.addEventListener("change", applyFilters);
@@ -411,20 +496,6 @@
             if (statusFilter) statusFilter.value = "";
             applyFilters();
           });
-        applyFilters();
-        var stats = data.stats || data.Stats;
-        var last = stats && (stats.lastSyncUtc || stats.LastSyncUtc);
-        if (last) {
-          var el = document.querySelector(".sidebar-footer strong");
-          if (el) el.textContent = formatDateTime(last);
-        }
-        var hintEl = document.getElementById("devices-sidebar-hint");
-        if (hintEl && stats) {
-          var t = stats.totalDevices != null ? stats.totalDevices : stats.TotalDevices;
-          var r = stats.riskyDevices != null ? stats.riskyDevices : stats.RiskyDevices;
-          hintEl.textContent = "Toplam " + formatInt(t) + " cihaz; " + formatInt(r) + " yüksek riskli.";
-        }
-        setText("topbar-date-devices", new Date().toLocaleDateString("tr-TR", { weekday: "long", year: "numeric", month: "long", day: "numeric" }));
       })
       .catch(function (err) {
         console.error(err);
@@ -436,6 +507,8 @@
   global.DashboardApp = {
     initOverview: initOverview,
     initDevices: initDevices,
-    getApiBase: getApiBase
+    getApiBase: getApiBase,
+    getAdminHeaders: getAdminHeaders,
+    apiFetch: apiFetch
   };
 })(typeof window !== "undefined" ? window : this);

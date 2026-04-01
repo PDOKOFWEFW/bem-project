@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<ApiSettings>(builder.Configuration.GetSection(ApiSettings.SectionName));
 builder.Services.Configure<SecuritySettings>(builder.Configuration.GetSection(SecuritySettings.SectionName));
+builder.Services.Configure<PolicyResponseOptions>(builder.Configuration.GetSection(PolicyResponseOptions.SectionName));
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Data Source=endpoint.db";
@@ -17,6 +18,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IPolicyEngine, PolicyEngine>();
 builder.Services.AddScoped<IRiskScoringService, RiskScoringService>();
 builder.Services.AddSingleton<IEnrollmentTokenValidator, EnrollmentTokenValidator>();
+builder.Services.AddSingleton<IAdminApiKeyValidator, AdminApiKeyValidator>();
 builder.Services.AddScoped<IDashboardQueryService, DashboardQueryService>();
 
 builder.Services.AddControllers();

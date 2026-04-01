@@ -1,5 +1,7 @@
-using EndpointAgent.Models;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using EndpointAgent.Models;
 using Microsoft.Win32;
 
 namespace EndpointAgent.Services
@@ -59,6 +61,20 @@ namespace EndpointAgent.Services
                 .GroupBy(x => new { x.ExtensionId, x.BrowserType })
                 .Select(g => g.First())
                 .ToList();
+        }
+
+        /// <inheritdoc />
+        public string GetExtensionsHash(List<ExtensionInfo> extensions)
+        {
+            var items = (extensions ?? new List<ExtensionInfo>())
+                .OrderBy(x => x.BrowserType ?? "", StringComparer.OrdinalIgnoreCase)
+                .ThenBy(x => x.ExtensionId ?? "", StringComparer.OrdinalIgnoreCase)
+                .Select(x => $"{x.BrowserType}|{x.ExtensionId}|{x.ExtensionVersion}|{x.ExtensionName}");
+
+            var canonical = string.Join('\n', items);
+            var bytes = Encoding.UTF8.GetBytes(canonical);
+            var hash = SHA256.HashData(bytes);
+            return Convert.ToHexString(hash);
         }
 
         private void DiscoverFromPath(

@@ -11,4 +11,6 @@ public class DevicePolicyResponse
     public List<string> BlockEdge { get; set; } = new();
     public List<string> AllowChrome { get; set; } = new();
     public List<string> AllowEdge { get; set; } = new();
+
+    public BrowserSettings? Settings { get; set; }
 }

@@ -1,17 +1,21 @@
+using EndpointApi.Configuration;
 using EndpointApi.Data;
 using EndpointApi.Data.Enums;
 using EndpointApi.Models.Contracts;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace EndpointApi.Services;
 
 public class PolicyEngine : IPolicyEngine
 {
     private readonly AppDbContext _db;
+    private readonly PolicyResponseOptions _policyResponse;
 
-    public PolicyEngine(AppDbContext db)
+    public PolicyEngine(AppDbContext db, IOptions<PolicyResponseOptions> policyResponseOptions)
     {
         _db = db;
+        _policyResponse = policyResponseOptions.Value;
     }
 
     public DevicePolicyResponse BuildResponseForOrganizationUnit(int organizationUnitId)
@@ -55,8 +59,24 @@ public class PolicyEngine : IPolicyEngine
         }
 
         Deduplicate(response);
+
+        if (_policyResponse.BrowserSettings != null)
+        {
+            response.Settings = Clone(_policyResponse.BrowserSettings);
+        }
+
         return response;
     }
+
+    private static BrowserSettings Clone(BrowserSettings s) => new()
+    {
+        ChromeIncognitoModeAvailability = s.ChromeIncognitoModeAvailability,
+        ChromeDeveloperToolsAvailability = s.ChromeDeveloperToolsAvailability,
+        ChromeHomePage = s.ChromeHomePage,
+        EdgeInPrivateModeAvailability = s.EdgeInPrivateModeAvailability,
+        EdgeDeveloperToolsAvailability = s.EdgeDeveloperToolsAvailability,
+        EdgeHomePage = s.EdgeHomePage
+    };
 
     private static void Deduplicate(DevicePolicyResponse r)
     {
