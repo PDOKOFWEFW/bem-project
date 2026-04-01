@@ -25,17 +25,14 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-var apiSettings = builder.Configuration.GetSection(ApiSettings.SectionName).Get<ApiSettings>() ?? new ApiSettings();
-if (apiSettings.CorsOrigins is { Length: > 0 })
+// 🟢 KESİN CORS ÇÖZÜMÜ: Her kökene, her metoda ve her başlığa izin ver!
+builder.Services.AddCors(options =>
 {
-    builder.Services.AddCors(options =>
-    {
-        options.AddPolicy("DashboardCors", policy =>
-            policy.WithOrigins(apiSettings.CorsOrigins)
-                .AllowAnyHeader()
-                .AllowAnyMethod());
-    });
-}
+    options.AddPolicy("DashboardCors", policy =>
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod());
+});
 
 var app = builder.Build();
 
@@ -52,8 +49,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-if (apiSettings.CorsOrigins is { Length: > 0 })
-    app.UseCors("DashboardCors");
+// 🟢 CORS Katmanını Aktifleştir
+app.UseCors("DashboardCors");
 
 app.MapControllers();
 
